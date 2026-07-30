@@ -1,5 +1,8 @@
 # TornadoInTui
 
+<img width="1220" height="1212" alt="image" src="https://github.com/user-attachments/assets/5069f450-1abf-4438-a3b1-036b48196b29" />
+
+
 TornadoInTui is a small C++ program that renders an animated tornado directly inside your terminal using ANSI escape sequences.
 
 ## Requirements
