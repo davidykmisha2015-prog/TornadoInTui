@@ -7,6 +7,8 @@
 #include <sys/ioctl.h>
 #include <thread>
 #include <unistd.h>
+#include <vector>
+#include <fstream>
 
 bool running = true;
 
@@ -39,9 +41,158 @@ TerminalSize getTerminalSize() {
 	};
 }
 
-int main() {
+enum class TornadoType {
+    Rope,
+    Cone,
+    Cylinder,
+    VShaped,
+    MultiVortex
+};
+
+TornadoType parseTornadoType(int argc, char* argv[]) {
+    TornadoType type = TornadoType::VShaped;
+
+    for (int i = 1; i < argc; ++i) {
+        const std::string argument = argv[i];
+
+        if (argument == "--rope") {
+            type = TornadoType::Rope;
+        } else if (argument == "--cone") {
+            type = TornadoType::Cone;
+        } else if (argument == "--cylinder") {
+            type = TornadoType::Cylinder;
+        } else if (argument == "--v-shaped") {
+            type = TornadoType::VShaped;
+        } else if (argument == "--multivortex") {
+            type = TornadoType::MultiVortex;
+        } else {
+            std::cerr << "Unknown flag: " << argument << '\n';
+        }
+    }
+
+    return type;
+}
+
+float getHalfWidth(
+    TornadoType type,
+    float progress,
+    int screenWidth,
+    float time
+) {
+    float halfWidth = 2.0f;
+
+    switch (type) {
+        case TornadoType::Rope: {
+            halfWidth =
+                screenWidth * 0.022f
+                + (1.0f - progress) * screenWidth * 0.012f
+                + std::sin(progress * 12.0f + time) * 0.7f;
+            break;
+        }
+
+        case TornadoType::Cone: {
+            const float topWidth = screenWidth * 0.18f;
+            const float bottomWidth = screenWidth * 0.025f;
+
+            halfWidth =
+                topWidth * (1.0f - progress)
+                + bottomWidth * progress;
+            break;
+        }
+
+        case TornadoType::Cylinder: {
+            halfWidth = screenWidth * 0.095f;
+
+            // Ледь помітна нерівність країв.
+            halfWidth +=
+                std::sin(progress * 9.0f - time * 0.7f) * 0.5f;
+            break;
+        }
+
+        case TornadoType::VShaped: {
+            const float topWidth = screenWidth * 0.27f;
+            const float bottomWidth = screenWidth * 0.018f;
+
+            /*
+             * pow робить верх ширшим і виразніше
+             * відрізняє V-shaped від звичайного cone.
+             */
+            const float shape =
+                std::pow(1.0f - progress, 0.72f);
+
+            halfWidth =
+                bottomWidth
+                + (topWidth - bottomWidth) * shape;
+            break;
+        }
+
+        case TornadoType::MultiVortex: {
+            // Межі всієї головної циркуляції.
+            const float topWidth = screenWidth * 0.25f;
+            const float bottomWidth = screenWidth * 0.13f;
+
+            halfWidth =
+                topWidth * (1.0f - progress)
+                + bottomWidth * progress;
+            break;
+        }
+    }
+
+    const float breathing =
+        std::sin(time * 0.8f - progress * 5.0f)
+        * screenWidth * 0.004f;
+
+    return std::max(1.2f, halfWidth + breathing);
+}
+float getCenterMovement(
+    TornadoType type,
+    float progress,
+    int screenWidth,
+    float time
+) {
+    float strength = 1.0f;
+
+    switch (type) {
+        case TornadoType::Rope:
+            strength =
+                2.0f + screenWidth * 0.025f;
+            break;
+
+        case TornadoType::Cone:
+            strength =
+                1.0f + screenWidth * 0.008f;
+            break;
+
+        case TornadoType::Cylinder:
+            strength =
+                0.5f + screenWidth * 0.003f;
+            break;
+
+        case TornadoType::VShaped:
+            strength =
+                0.8f + screenWidth * 0.006f;
+            break;
+
+        case TornadoType::MultiVortex:
+            strength =
+                0.6f + screenWidth * 0.004f;
+            break;
+    }
+
+    // Верх рухається трохи більше, ніж низ.
+    strength *= 0.45f + (1.0f - progress) * 0.55f;
+
+    return std::sin(
+        time * 0.65f + progress * 4.0f
+    ) * strength;
+}
+
+int main(int argc, char* argv[]) {
+    const TornadoType tornadoType =
+        parseTornadoType(argc, argv);
+
 	std::signal(SIGINT, handleSignal);
-	std::signal(SIGINT, handleSignal);
+	std::signal(SIGTERM, handleSignal);	
 
         std::cout << "\x1b[2J"
 		  << "\x1b[?25l";
@@ -62,12 +213,6 @@ int main() {
 
     const int verticalOffset =
         std::max(0, (screenHeight - tornadoHeight) / 2);
-
-    const float topHalfWidth =
-        std::max(8.0f, screenWidth * 0.28f);
-
-    const float bottomHalfWidth =
-        std::max(5.0f, screenWidth * 0.14f);
 
     std::string frame;
 
@@ -96,46 +241,89 @@ int main() {
                  * Верх рухається сильніше за низ.
                  * Різна фаза на кожній висоті викручує форму.
                  */
-                const float swayStrength =
-                    1.5f + (1.0f - progress) * screenWidth * 0.025f;
-
                 const float centerMovement =
-                    std::sin(time * 0.75f + progress * 4.2f) *
-                    swayStrength;
+    getCenterMovement(
+        tornadoType,
+        progress,
+        screenWidth,
+        time
+    );
 
-                const float centerX =
-                    screenWidth / 2.0f + centerMovement;
+const float centerX =
+    screenWidth / 2.0f + centerMovement;
 
-                // Основна wedge-форма.
-                float halfWidth =
-                    topHalfWidth +
-                    (bottomHalfWidth - topHalfWidth) * progress;
+const float halfWidth =
+    getHalfWidth(
+        tornadoType,
+        progress,
+        screenWidth,
+        time
+    ); 
+		const float pixelX = static_cast<float>(x);
+const float distance = std::abs(pixelX - centerX);
 
-                /*
-                 * Краї трохи стискаються й розширюються.
-                 * На різній висоті це відбувається неодночасно.
-                 */
-                const float breathing =
-                    std::sin(time * 1.1f - progress * 6.0f) *
-                    screenWidth * 0.012f;
+bool insideTornado = distance <= halfWidth;
 
-                halfWidth += breathing;
-                halfWidth = std::max(3.0f, halfWidth);
+float textureCenterX = centerX;
+float textureHalfWidth = halfWidth;
 
-                const float distance =
-                    std::abs(static_cast<float>(x) - centerX);
+if (tornadoType == TornadoType::MultiVortex) {
+    insideTornado = false;
 
-                if (distance > halfWidth) {
-                    frame += ' ';
-                    continue;
-                }
+    constexpr int vortexCount = 3;
+    constexpr float pi = 3.14159265f;
 
-                /*
-                 * Нормалізована координата всередині торнадо:
-                 * -1 біля лівого краю, 0 у центрі, +1 справа.
-                 */
-                const float localX =
-                    (static_cast<float>(x) - centerX) / halfWidth;
+    /*
+     * У верхній частині вихори зливаються
+     * в одну широку циркуляцію.
+     */
+    if (progress < 0.38f && distance <= halfWidth) {
+        insideTornado = true;
+    }
+
+    for (int vortex = 0; vortex < vortexCount; ++vortex) {
+        const float phase =
+            time * 2.0f
+            + progress * 2.6f
+            + vortex * (2.0f * pi / vortexCount);
+
+        /*
+         * Через sin видно умовний рух вихорів
+         * по орбіті в 2D-проєкції.
+         */
+        const float orbitRadius =
+            halfWidth * (0.30f + progress * 0.28f);
+
+        const float vortexCenterX =
+            centerX + std::sin(phase) * orbitRadius;
+
+        const float vortexHalfWidth =
+            std::max(
+                1.2f,
+                screenWidth
+                    * (0.014f
+                       + (1.0f - progress) * 0.018f)
+            );
+
+        const float vortexDistance =
+            std::abs(pixelX - vortexCenterX);
+
+        if (vortexDistance <= vortexHalfWidth) {
+            insideTornado = true;
+            textureCenterX = vortexCenterX;
+            textureHalfWidth = vortexHalfWidth;
+            break;
+        }
+    }
+}
+
+if (!insideTornado) {
+    frame += ' ';
+    continue;
+}
+
+const float localX =
+    (pixelX - textureCenterX) / textureHalfWidth;
 
                 /*
                  * Основний рух текстури.
