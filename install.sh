@@ -14,7 +14,7 @@ mkdir -p "$CONFIG_DIR"
 echo "[*] Downloading source..."
 
 curl -fsSL \
-https://raw.githubusercontent.com/davidykmisha2015-prog/TornadoInTui/main/Tornado.cpp \
+https://raw.githubusercontent.com/davidykmisha2015-prog/TornadoInTui/main/src/Tornado.cpp \
 -o "$TMP_DIR/Tornado.cpp"
 
 echo "[*] Downloading default configuration..."

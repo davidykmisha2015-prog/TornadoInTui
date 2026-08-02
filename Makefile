@@ -1,7 +1,7 @@
-CXX := g++
+CXX := c++
 CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -Wpedantic
 TARGET := tornado
-SOURCE := Tornado.cpp
+SOURCE := src/Tornado.cpp
 
 PREFIX ?= /usr/local
 BINDIR := $(PREFIX)/bin
