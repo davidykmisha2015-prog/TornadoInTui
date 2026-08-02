@@ -4,25 +4,53 @@ set -e
 
 echo "[*] Installing TornadoInTui..."
 
-mkdir -p "$HOME/.local/bin"
-
+BIN_DIR="$HOME/.local/bin"
+CONFIG_DIR="$HOME/.config/tornadointui"
 TMP_DIR=$(mktemp -d)
+
+mkdir -p "$BIN_DIR"
+mkdir -p "$CONFIG_DIR"
 
 echo "[*] Downloading source..."
 
-curl -L \
+curl -fsSL \
 https://raw.githubusercontent.com/davidykmisha2015-prog/TornadoInTui/main/Tornado.cpp \
 -o "$TMP_DIR/Tornado.cpp"
 
+echo "[*] Downloading default configuration..."
+
+curl -fsSL \
+https://raw.githubusercontent.com/davidykmisha2015-prog/TornadoInTui/main/config.example.ini \
+-o "$TMP_DIR/config.example.ini"
+
 echo "[*] Compiling..."
 
-c++ -O2 "$TMP_DIR/Tornado.cpp" -o "$HOME/.local/bin/tornado"
+c++ -O2 "$TMP_DIR/Tornado.cpp" \
+-o "$BIN_DIR/tornado"
 
-chmod +x "$HOME/.local/bin/tornado"
+chmod +x "$BIN_DIR/tornado"
+
+if [ ! -f "$CONFIG_DIR/config.ini" ]; then
+    cp "$TMP_DIR/config.example.ini" \
+       "$CONFIG_DIR/config.ini"
+
+    echo "[+] Created:"
+    echo "    $CONFIG_DIR/config.ini"
+else
+    echo "[*] Existing configuration found."
+    echo "    Keeping current config."
+fi
+
+cp "$TMP_DIR/config.example.ini" \
+   "$CONFIG_DIR/config.example.ini"
 
 rm -rf "$TMP_DIR"
 
 echo
-echo "Installed!"
+echo "[✓] TornadoInTui installed successfully!"
+echo
 echo "Run:"
-echo "tornado"
+echo "  tornado"
+echo
+echo "Configuration:"
+echo "  $CONFIG_DIR/config.ini"
